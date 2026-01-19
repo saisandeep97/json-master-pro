@@ -1,29 +1,41 @@
 :root {
   /* HSL Color Palette - Premium Dark Theme */
-  --color-background: 224 71% 4%; /* #020617 (Slate 950 base) */
-  --color-surface: 222 47% 11%; /* #0f172a (Slate 900) */
-  --color-surface-hover: 217 33% 17%; /* #1e293b (Slate 800) */
+  --color-background: 224 71% 4%;
+  /* #020617 (Slate 950 base) */
+  --color-surface: 222 47% 11%;
+  /* #0f172a (Slate 900) */
+  --color-surface-hover: 217 33% 17%;
+  /* #1e293b (Slate 800) */
   --color-surface-active: 215 28% 19%;
-  --color-border: 217 33% 17%; /* #1e293b (Slate 800) */
-  
+  --color-border: 217 33% 17%;
+  /* #1e293b (Slate 800) */
+
   /* Primary - Indigo */
-  --color-primary: 243 75% 59%; /* #6366f1 (Indigo 500) */
+  --color-primary: 243 75% 59%;
+  /* #6366f1 (Indigo 500) */
   --color-primary-hover: 244 75% 65%;
   --color-primary-dim: 243 75% 59% / 0.15;
-  
+
   /* Accent - Pink/Rose */
-  --color-accent: 330 81% 60%; /* #f43f5e (Rose 500) */
+  --color-accent: 330 81% 60%;
+  /* #f43f5e (Rose 500) */
   --color-accent-hover: 330 81% 65%;
 
   /* Text Colors */
-  --color-text-main: 210 40% 98%; /* #f8fafc (Slate 50) */
-  --color-text-secondary: 215 20% 80%; /* #cbd5e1 (Slate 300) */
-  --color-text-muted: 215 16% 47%; /* #64748b (Slate 500) */
-  
+  --color-text-main: 210 40% 98%;
+  /* #f8fafc (Slate 50) */
+  --color-text-secondary: 215 20% 80%;
+  /* #cbd5e1 (Slate 300) */
+  --color-text-muted: 215 16% 47%;
+  /* #64748b (Slate 500) */
+
   /* Status Colors */
-  --color-error: 0 84% 60%; /* Red 500 */
-  --color-success: 142 71% 45%; /* Green 500 */
-  --color-warning: 38 92% 50%; /* Amber 500 */
+  --color-error: 0 84% 60%;
+  /* Red 500 */
+  --color-success: 142 71% 45%;
+  /* Green 500 */
+  --color-warning: 38 92% 50%;
+  /* Amber 500 */
 
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
@@ -32,7 +44,7 @@
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
-  
+
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
@@ -78,13 +90,16 @@ a {
   width: 8px;
   height: 8px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: hsl(var(--color-surface-hover));
   border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--color-text-muted));
 }
@@ -96,30 +111,122 @@ a {
   padding: 0 1.5rem;
 }
 
-.flex { display: flex; }
-.flex-col { flex-direction: column; }
-.items-center { align-items: center; }
-.justify-between { justify-content: space-between; }
-.justify-center { justify-content: center; }
-.gap-2 { gap: 0.5rem; }
-.gap-3 { gap: 0.75rem; }
-.gap-4 { gap: 1rem; }
-.gap-8 { gap: 2rem; }
+.flex {
+  display: flex;
+}
 
-.grid { display: grid; }
-.h-screen { height: 100vh; }
-.h-full { height: 100%; }
-.w-full { width: 100%; }
+.flex-col {
+  flex-direction: column;
+}
 
-.font-mono { font-family: var(--font-mono); }
-.text-sm { font-size: 0.875rem; }
-.text-xs { font-size: 0.75rem; }
+.items-center {
+  align-items: center;
+}
 
-.text-primary { color: hsl(var(--color-primary)); }
-.text-accent { color: hsl(var(--color-accent)); }
-.text-muted { color: hsl(var(--color-text-muted)); }
-.text-error { color: hsl(var(--color-error)); }
-.text-success { color: hsl(var(--color-success)); }
+.justify-between {
+  justify-content: space-between;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.gap-3 {
+  gap: 0.75rem;
+}
+
+.gap-4 {
+  gap: 1rem;
+}
+
+.gap-8 {
+  gap: 2rem;
+}
+
+.grid {
+  display: grid;
+}
+
+.grid-cols-1 {
+  grid-template-columns: 1fr;
+}
+
+.grid-cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.gap-6 {
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .lg\:grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.relative {
+  position: relative;
+}
+
+.absolute {
+  position: absolute;
+}
+
+.inset-0 {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.h-screen {
+  height: 100vh;
+}
+
+.h-full {
+  height: 100%;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.text-sm {
+  font-size: 0.875rem;
+}
+
+.text-xs {
+  font-size: 0.75rem;
+}
+
+.text-primary {
+  color: hsl(var(--color-primary));
+}
+
+.text-accent {
+  color: hsl(var(--color-accent));
+}
+
+.text-muted {
+  color: hsl(var(--color-text-muted));
+}
+
+.text-error {
+  color: hsl(var(--color-error));
+}
+
+.text-success {
+  color: hsl(var(--color-success));
+}
 
 .btn {
   display: inline-flex;
@@ -142,11 +249,13 @@ a {
   box-shadow: var(--shadow-glow);
   border: 1px solid hsl(var(--color-primary));
 }
+
 .btn-primary:hover {
   background-color: hsl(var(--color-primary-hover));
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
 }
+
 .btn-primary:active {
   transform: translateY(0);
 }
@@ -154,6 +263,7 @@ a {
 .btn-ghost {
   color: hsl(var(--color-text-secondary));
 }
+
 .btn-ghost:hover {
   background-color: hsl(var(--color-surface-hover));
   color: hsl(var(--color-text-main));
@@ -165,6 +275,7 @@ a {
   color: hsl(var(--color-text-muted));
   transition: all 0.2s;
 }
+
 .icon-btn:hover {
   color: hsl(var(--color-text-main));
   background-color: hsl(var(--color-surface-hover));
@@ -187,6 +298,7 @@ a {
   font-size: 0.875rem;
   transition: all 0.2s;
 }
+
 .input-base:focus {
   border-color: hsl(var(--color-primary));
   outline: none;
@@ -206,6 +318,7 @@ a {
   position: relative;
   overflow: hidden;
 }
+
 .shimmer::after {
   content: '';
   position: absolute;
@@ -213,12 +326,10 @@ a {
   right: 0;
   bottom: 0;
   left: 0;
-  background: linear-gradient(
-    to right,
-    transparent 0%,
-    rgba(255, 255, 255, 0.05) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(to right,
+      transparent 0%,
+      rgba(255, 255, 255, 0.05) 50%,
+      transparent 100%);
   transform: translateX(-100%);
   animation: shimmer 2s infinite;
 }

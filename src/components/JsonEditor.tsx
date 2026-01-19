@@ -157,9 +157,9 @@ export default function JsonEditor() {
             </div>
 
             {/* Editor Area */}
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[500px]">
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6" style={{ minHeight: 'calc(100vh - 200px)' }}>
                 {/* Input Pane */}
-                <div className="flex flex-col h-full card border-0 p-0 overflow-hidden relative group bg-[hsl(var(--color-background))]/50">
+                <div className="flex flex-col card border-0 p-0 overflow-hidden relative group bg-[hsl(var(--color-background))]/50" style={{ height: '100%', minHeight: '500px' }}>
                     <div className="flex justify-between items-center text-xs font-medium text-[hsl(var(--color-text-muted))] px-4 py-2.5 bg-[hsl(var(--color-surface))] border-b border-[hsl(var(--color-border))]">
                         <span className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full ${status === 'invalid' ? 'bg-rose-500' : 'bg-indigo-500'} shadow-[0_0_8px_rgba(99,102,241,0.5)]`}></div>
@@ -170,8 +170,8 @@ export default function JsonEditor() {
                         </span>
                     </div>
 
-                    <div className="flex-1 relative min-h-0 bg-[hsl(var(--color-background))]">
-                        <div className="absolute inset-0">
+                    <div className="flex-1 relative bg-[hsl(var(--color-background))]" style={{ minHeight: '400px', overflow: 'hidden' }}>
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
                             <Editor
                                 height="100%"
                                 defaultLanguage="json"
@@ -208,7 +208,7 @@ export default function JsonEditor() {
                 </div>
 
                 {/* Tools Pane */}
-                <div className="h-full min-h-[400px] lg:min-h-0">
+                <div style={{ height: '100%', minHeight: '500px' }}>
                     <ToolsPanel jsonInput={input} isValid={status === 'valid'} />
                 </div>
             </div>

@@ -45,14 +45,14 @@ export default function ToolsPanel({ jsonInput, isValid }: ToolsPanelProps) {
     };
 
     return (
-        <div className="flex flex-col h-full card border-0 p-0 overflow-hidden bg-[hsl(var(--color-surface))]/50 backdrop-blur-sm shadow-xl">
+        <div className="flex flex-col h-full card border-0 p-0 overflow-hidden bg-[hsl(var(--color-surface))]/50 backdrop-blur-sm shadow-xl" style={{ height: '100%' }}>
             {/* Tabs Header */}
             <div className="flex items-center text-xs font-medium border-b border-[hsl(var(--color-border))] bg-[hsl(var(--color-surface))]">
                 <button
                     onClick={() => setActiveTab('preview')}
                     className={`flex-1 py-3 flex items-center justify-center gap-2 transition-all relative ${activeTab === 'preview'
-                            ? 'text-indigo-400 bg-[hsl(var(--color-background))]/50'
-                            : 'text-[hsl(var(--color-text-muted))] hover:text-[hsl(var(--color-text-main))] hover:bg-[hsl(var(--color-surface-hover))]'
+                        ? 'text-indigo-400 bg-[hsl(var(--color-background))]/50'
+                        : 'text-[hsl(var(--color-text-muted))] hover:text-[hsl(var(--color-text-main))] hover:bg-[hsl(var(--color-surface-hover))]'
                         }`}
                 >
                     <FileJson size={16} /> <span className="uppercase tracking-wide">Preview</span>
@@ -64,8 +64,8 @@ export default function ToolsPanel({ jsonInput, isValid }: ToolsPanelProps) {
                 <button
                     onClick={() => { setActiveTab('convert'); setConversionType('YAML'); }}
                     className={`flex-1 py-3 flex items-center justify-center gap-2 transition-all relative ${activeTab === 'convert'
-                            ? 'text-pink-400 bg-[hsl(var(--color-background))]/50'
-                            : 'text-[hsl(var(--color-text-muted))] hover:text-[hsl(var(--color-text-main))] hover:bg-[hsl(var(--color-surface-hover))]'
+                        ? 'text-pink-400 bg-[hsl(var(--color-background))]/50'
+                        : 'text-[hsl(var(--color-text-muted))] hover:text-[hsl(var(--color-text-main))] hover:bg-[hsl(var(--color-surface-hover))]'
                         }`}
                 >
                     <FileType size={16} /> <span className="uppercase tracking-wide">Convert</span>
@@ -77,8 +77,8 @@ export default function ToolsPanel({ jsonInput, isValid }: ToolsPanelProps) {
                 <button
                     onClick={() => { setActiveTab('generate'); setConversionType('TypeScript'); }}
                     className={`flex-1 py-3 flex items-center justify-center gap-2 transition-all relative ${activeTab === 'generate'
-                            ? 'text-emerald-400 bg-[hsl(var(--color-background))]/50'
-                            : 'text-[hsl(var(--color-text-muted))] hover:text-[hsl(var(--color-text-main))] hover:bg-[hsl(var(--color-surface-hover))]'
+                        ? 'text-emerald-400 bg-[hsl(var(--color-background))]/50'
+                        : 'text-[hsl(var(--color-text-muted))] hover:text-[hsl(var(--color-text-main))] hover:bg-[hsl(var(--color-surface-hover))]'
                         }`}
                 >
                     <Code size={16} /> <span className="uppercase tracking-wide">Generate</span>
@@ -95,8 +95,8 @@ export default function ToolsPanel({ jsonInput, isValid }: ToolsPanelProps) {
                                 key={type}
                                 onClick={() => setConversionType(type)}
                                 className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${conversionType === type
-                                        ? 'bg-pink-500 text-white shadow-md'
-                                        : 'text-[hsl(var(--color-text-muted))] hover:text-white hover:bg-[hsl(var(--color-surface-hover))]'
+                                    ? 'bg-pink-500 text-white shadow-md'
+                                    : 'text-[hsl(var(--color-text-muted))] hover:text-white hover:bg-[hsl(var(--color-surface-hover))]'
                                     }`}
                             >
                                 {type}
@@ -107,8 +107,8 @@ export default function ToolsPanel({ jsonInput, isValid }: ToolsPanelProps) {
                                 key={type}
                                 onClick={() => setConversionType(type)}
                                 className={`px-3 py-1 rounded text-[10px] font-bold transition-all ${conversionType === type
-                                        ? 'bg-emerald-500 text-white shadow-md'
-                                        : 'text-[hsl(var(--color-text-muted))] hover:text-white hover:bg-[hsl(var(--color-surface-hover))]'
+                                    ? 'bg-emerald-500 text-white shadow-md'
+                                    : 'text-[hsl(var(--color-text-muted))] hover:text-white hover:bg-[hsl(var(--color-surface-hover))]'
                                     }`}
                             >
                                 {type}
