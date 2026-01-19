@@ -111,7 +111,7 @@ export default function JsonEditor() {
                 <div className="flex flex-wrap items-center justify-between gap-4 w-full">
                     <div className="flex items-center gap-4">
                         <div className={`flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full transition-colors duration-300 border ${status === 'valid' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                status === 'invalid' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-slate-800/50 border-slate-700 text-slate-400'
+                            status === 'invalid' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-slate-800/50 border-slate-700 text-slate-400'
                             }`}>
                             {status === 'valid' && <CheckCircle size={14} />}
                             {status === 'invalid' && <AlertTriangle size={14} />}
@@ -155,29 +155,31 @@ export default function JsonEditor() {
                         <span className="font-mono opacity-70">{input.length} chars</span>
                     </div>
 
-                    <div className="flex-1 relative">
-                        <Editor
-                            height="100%"
-                            defaultLanguage="json"
-                            theme="vs-dark"
-                            value={input}
-                            onChange={(value) => setInput(value || '')}
-                            onMount={handleEditorDidMount}
-                            options={{
-                                minimap: { enabled: false },
-                                fontSize: 13,
-                                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                                wordWrap: 'on',
-                                formatOnPaste: true,
-                                automaticLayout: true,
-                                padding: { top: 16, bottom: 16 },
-                                scrollBeyondLastLine: false,
-                                renderLineHighlight: 'all',
-                                smoothScrolling: true,
-                                cursorBlinking: 'smooth',
-                                cursorSmoothCaretAnimation: 'on'
-                            }}
-                        />
+                    <div className="flex-1 relative min-h-0">
+                        <div className="absolute inset-0">
+                            <Editor
+                                height="100%"
+                                defaultLanguage="json"
+                                theme="vs-dark"
+                                value={input}
+                                onChange={(value) => setInput(value || '')}
+                                onMount={handleEditorDidMount}
+                                options={{
+                                    minimap: { enabled: false },
+                                    fontSize: 13,
+                                    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                                    wordWrap: 'on',
+                                    formatOnPaste: true,
+                                    automaticLayout: true,
+                                    padding: { top: 16, bottom: 16 },
+                                    scrollBeyondLastLine: false,
+                                    renderLineHighlight: 'all',
+                                    smoothScrolling: true,
+                                    cursorBlinking: 'smooth',
+                                    cursorSmoothCaretAnimation: 'on'
+                                }}
+                            />
+                        </div>
                     </div>
 
                     {errorMessage && (
