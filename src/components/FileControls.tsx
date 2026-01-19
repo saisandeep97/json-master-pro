@@ -55,8 +55,8 @@ export default function FileControls({ onLoadContent, currentContent }: FileCont
     };
 
     return (
-        <div className="flex items-center gap-1 border-r border-slate-700 pr-2 mr-2">
-            <button className="btn btn-ghost px-2 text-slate-400 hover:text-white" onClick={() => document.getElementById('file-upload')?.click()} title="Open File">
+        <div className="flex items-center gap-1">
+            <button className="icon-btn" onClick={() => document.getElementById('file-upload')?.click()} title="Open File">
                 <FolderOpen size={18} />
             </button>
             <input
@@ -68,11 +68,11 @@ export default function FileControls({ onLoadContent, currentContent }: FileCont
                 onChange={handleFileUpload}
             />
 
-            <button className="btn btn-ghost px-2 text-slate-400 hover:text-white" onClick={handleSaveFile} title="Save File">
+            <button className="icon-btn" onClick={handleSaveFile} title="Save File">
                 <Save size={18} />
             </button>
 
-            <button className="btn btn-ghost px-2 text-slate-400 hover:text-white" onClick={handleUrlLoad} title="Load from URL">
+            <button className="icon-btn" onClick={handleUrlLoad} title="Load from URL">
                 <LinkIcon size={18} />
             </button>
         </div>
