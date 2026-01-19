@@ -63,6 +63,7 @@ export default function FileControls({ onLoadContent, currentContent }: FileCont
                 type="file"
                 id="file-upload"
                 className="hidden"
+                style={{ display: 'none' }}
                 accept=".json,.txt"
                 onChange={handleFileUpload}
             />
