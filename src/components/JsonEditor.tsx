@@ -97,7 +97,7 @@ export default function JsonEditor() {
     }
 
     return (
-        <div className="flex flex-col h-full gap-4">
+        <div className="flex flex-col h-full w-full gap-4" style={{ minHeight: '100%' }}>
             <Toaster position="bottom-right" toastOptions={{
                 style: {
                     background: '#1e293b',
@@ -147,9 +147,9 @@ export default function JsonEditor() {
             </div>
 
             {/* Editor Area */}
-            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4" style={{ minHeight: '600px' }}>
                 {/* Input Pane */}
-                <div className="flex flex-col h-full card border-0 p-0 overflow-hidden relative group bg-slate-900/50 backdrop-blur-sm border border-slate-800/50 shadow-xl">
+                <div className="flex flex-col h-full card border-0 p-0 overflow-hidden relative group bg-slate-900/50 backdrop-blur-sm border border-slate-800/50 shadow-xl" style={{ height: '100%' }}>
                     <div className="flex justify-between items-center text-xs font-medium text-slate-400 px-4 py-2 bg-slate-800/50 border-b border-slate-700/50">
                         <span className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-blue-400"></div> Input</span>
                         <span className="font-mono opacity-70">{input.length} chars</span>
