@@ -1,8 +1,11 @@
 import JSON5 from 'json5';
+import yaml from 'js-yaml';
+import { js2xml } from 'xml-js';
+import { Parser } from 'json2csv';
+import JsonToTS from 'json-to-ts';
 
 /**
  * Validates a JSON string.
- * Returns { valid: true } or { valid: false, error: string }
  */
 export function validateJson(jsonString: string): { valid: boolean; error?: string } {
   try {
@@ -15,7 +18,6 @@ export function validateJson(jsonString: string): { valid: boolean; error?: stri
 
 /**
  * Formats a JSON string with 2-space indentation.
- * Assumes input is valid JSON (or will throw).
  */
 export function formatJson(jsonString: string): string {
   const parsed = JSON.parse(jsonString);
@@ -31,24 +33,61 @@ export function minifyJson(jsonString: string): string {
 }
 
 /**
- * Attempts to fix common JSON errors:
- * 1. Trailing commas
- * 2. Single quotes -> Double quotes (for keys and string values)
- * 3. Unquoted keys -> Quoted keys
- */
-/**
  * Attempts to fix common JSON errors by using JSON5 parsing.
- * JSON5 supports trailing commas, unquoted keys, and single quotes.
  */
 export function fixJson(jsonString: string): string {
   try {
-    // Use JSON5 to parse the "relaxed" JSON
     const parsed = JSON5.parse(jsonString);
-    // Convert back to strict standard JSON
     return JSON.stringify(parsed, null, 2);
   } catch (e) {
-    // If even JSON5 can't parse it, we can't fix it easily.
-    // Return original so user can debug.
     return jsonString;
+  }
+}
+
+/**
+ * Converts JSON string to YAML.
+ */
+export function toYaml(jsonString: string): string {
+  const parsed = JSON.parse(jsonString);
+  return yaml.dump(parsed);
+}
+
+/**
+ * Converts JSON string to XML.
+ */
+export function toXml(jsonString: string): string {
+  const parsed = JSON.parse(jsonString);
+  // Wrap in root element if necessary or let xml-js handle it
+  return js2xml({ root: parsed }, { compact: true, spaces: 2 });
+}
+
+/**
+ * Converts JSON string to CSV.
+ * Note: Only works well for flat arrays of objects.
+ */
+export function toCsv(jsonString: string): string {
+  const parsed = JSON.parse(jsonString);
+
+  // Check if it's an array, if not wrap it
+  const data = Array.isArray(parsed) ? parsed : [parsed];
+
+  try {
+    const parser = new Parser();
+    return parser.parse(data);
+  } catch (e: any) {
+    return `Error converting to CSV: ${e.message}`;
+  }
+}
+
+/**
+ * Generates TypeScript interfaces from JSON.
+ */
+export function toTypescript(jsonString: string): string {
+  const parsed = JSON.parse(jsonString);
+  try {
+    const interfaces = JsonToTS(parsed);
+    return interfaces.join('\n\n');
+  } catch (e: any) {
+    return `Error generating TypesScript: ${e.message}`;
   }
 }
