@@ -1,33 +1,34 @@
 :root {
-  /* HSL Color Palette - Premium Dark Theme */
-  --color-background: 224 71% 4%;
-  /* #020617 (Slate 950 base) */
-  --color-surface: 222 47% 11%;
-  /* #0f172a (Slate 900) */
-  --color-surface-hover: 217 33% 17%;
-  /* #1e293b (Slate 800) */
-  --color-surface-active: 215 28% 19%;
-  --color-border: 217 33% 17%;
-  /* #1e293b (Slate 800) */
+  /* HSL Color Palette - Default Light Theme */
+  --color-background: 210 40% 98%;
+  /* Slate 50 */
+  --color-surface: 0 0% 100%;
+  /* White */
+  --color-surface-hover: 210 40% 96%;
+  /* Slate 100 */
+  --color-surface-active: 214 32% 91%;
+  /* Slate 200 */
+  --color-border: 214 32% 91%;
+  /* Slate 200 */
 
   /* Primary - Indigo */
   --color-primary: 243 75% 59%;
-  /* #6366f1 (Indigo 500) */
+  /* Indigo 500 */
   --color-primary-hover: 244 75% 65%;
   --color-primary-dim: 243 75% 59% / 0.15;
 
   /* Accent - Pink/Rose */
   --color-accent: 330 81% 60%;
-  /* #f43f5e (Rose 500) */
+  /* Rose 500 */
   --color-accent-hover: 330 81% 65%;
 
   /* Text Colors */
-  --color-text-main: 210 40% 98%;
-  /* #f8fafc (Slate 50) */
-  --color-text-secondary: 215 20% 80%;
-  /* #cbd5e1 (Slate 300) */
-  --color-text-muted: 215 16% 47%;
-  /* #64748b (Slate 500) */
+  --color-text-main: 222 47% 11%;
+  /* Slate 900 */
+  --color-text-secondary: 215 16% 47%;
+  /* Slate 500 */
+  --color-text-muted: 215 25% 27%;
+  /* Slate 600 */
 
   /* Status Colors */
   --color-error: 0 84% 60%;
@@ -50,6 +51,29 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 10px 10px -5px rgb(0 0 0 / 0.04);
   --shadow-glow: 0 0 20px -5px rgba(99, 102, 241, 0.4);
+}
+
+.dark {
+  /* HSL Color Palette - Premium Dark Theme */
+  --color-background: 224 71% 4%;
+  /* Slate 950 */
+  --color-surface: 222 47% 11%;
+  /* Slate 900 */
+  --color-surface-hover: 217 33% 17%;
+  /* Slate 800 */
+  --color-surface-active: 215 28% 19%;
+  --color-border: 217 33% 17%;
+  /* Slate 800 */
+
+  /* Text Colors */
+  --color-text-main: 210 40% 98%;
+  /* Slate 50 */
+  --color-text-secondary: 215 20% 80%;
+  /* Slate 300 */
+  --color-text-muted: 215 16% 47%;
+  /* Slate 500 */
+
+  /* Retain other variables unless specific dark mode tweaks needed */
 }
 
 html,
@@ -87,8 +111,8 @@ a {
 
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
@@ -96,12 +120,16 @@ a {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--color-surface-hover));
-  border-radius: 4px;
+  background: hsl(var(--color-surface-active));
+  border: 4px solid rgba(0, 0, 0, 0);
+  background-clip: padding-box;
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--color-text-muted));
+  border: 4px solid rgba(0, 0, 0, 0);
+  background-clip: padding-box;
 }
 
 /* Utilities */

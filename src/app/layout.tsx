@@ -9,13 +9,17 @@ export const metadata: Metadata = {
   description: "The ultimate tool to validate, format, fix, and minify JSON data. Free, secure, and client-side.",
 };
 
+import { GlobalProvider } from "@/context/GlobalContext";
+
+// ... existing code ...
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* Google AdSense Script Placeholder */}
         {/* 
@@ -28,7 +32,11 @@ export default function RootLayout({
           crossOrigin="anonymous"
         ></script>
       </head>
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <GlobalProvider>
+          {children}
+        </GlobalProvider>
+      </body>
     </html>
   );
 }

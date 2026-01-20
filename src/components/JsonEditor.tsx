@@ -1,101 +1,185 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import Editor, { OnMount } from '@monaco-editor/react';
-import { validateJson, formatJson, minifyJson, fixJson } from '@/lib/json-utils';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { DiffEditor } from '@monaco-editor/react';
 import toast, { Toaster } from 'react-hot-toast';
-import { Play, AlignLeft, Minimize, Copy, Eraser, CheckCircle, AlertTriangle, AlertOctagon, Command, Sparkles } from 'lucide-react';
+import { ArrowRightLeft, ArrowRight, ArrowLeft } from 'lucide-react';
+import { useGlobal } from '@/context/GlobalContext';
 
-import ToolsPanel from './ToolsPanel';
-import FileControls from './FileControls';
+import EditorPane from './EditorPane';
+import StatusBar from './StatusBar';
+import TransformModal from './TransformModal';
+
+// Helper for safe transformation input
+const safeParse = (input: string) => {
+    try {
+        return JSON.parse(input);
+    } catch {
+        return null;
+    }
+};
+
+const useValidation = (json: string) => {
+    return useMemo(() => {
+        if (!json.trim()) return { status: 'idle' as const, error: '' };
+        try {
+            JSON.parse(json);
+            return { status: 'valid' as const, error: '' };
+        } catch (e: any) {
+            return { status: 'invalid' as const, error: e.message };
+        }
+    }, [json]);
+};
 
 export default function JsonEditor() {
-    const [input, setInput] = useState('');
-    const [status, setStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
-    const [errorMessage, setErrorMessage] = useState('');
+    const { layoutMode } = useGlobal();
+    const [leftInput, setLeftInput] = useState('');
+    const [rightInput, setRightInput] = useState('');
 
-    const editorRef = useRef<any>(null);
+    // Validation
+    const leftVal = useValidation(leftInput);
+    const rightVal = useValidation(rightInput);
+
+    // Transform State
+    const [transformOpen, setTransformOpen] = useState(false);
+    const [activePane, setActivePane] = useState<'left' | 'right'>('left');
+
+    // Resize State
+    const [splitRatio, setSplitRatio] = useState(50);
+    const [isDragging, setIsDragging] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Resize Logic
+    const handleMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
 
     useEffect(() => {
-        const saved = localStorage.getItem('json-master-input');
-        if (saved) {
-            setInput(saved);
-            const { valid, error } = validateJson(saved);
-            setStatus(valid ? 'valid' : 'invalid');
-            setErrorMessage(error || '');
-            if (valid) toast.success('Restored session', { duration: 2000, icon: '🔄' });
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isDragging || !containerRef.current) return;
+
+            const containerRect = containerRef.current.getBoundingClientRect();
+            const newRatio = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+
+            // Limit ratio between 20% and 80%
+            if (newRatio >= 20 && newRatio <= 80) {
+                setSplitRatio(newRatio);
+            }
+        };
+
+        const handleMouseUp = () => {
+            setIsDragging(false);
+        };
+
+        if (isDragging) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isDragging]);
+
+    const getStats = (text: string) => {
+        if (!text) return { size: '0 B', length: 0 };
+        const bytes = new TextEncoder().encode(text).length;
+        const size = bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(2)} KB`;
+        return { size, length: text.length };
+    };
+
+    const leftStats = useMemo(() => getStats(leftInput), [leftInput]);
+    const rightStats = useMemo(() => getStats(rightInput), [rightInput]);
+
+    useEffect(() => {
+        const savedLeft = localStorage.getItem('json-master-left');
+        const savedRight = localStorage.getItem('json-master-right');
+
+        const defaultLeft = JSON.stringify({
+            "project": "JSON Master Pro",
+            "version": "2.0.0",
+            "features": [
+                "Dual Pane Editor",
+                "Tree View Visualization",
+                "Smart JSON Fixer",
+                "Dark/Light Theme"
+            ],
+            "settings": {
+                "theme": "dark",
+                "notifications": true
+            }
+        }, null, 2);
+
+        const defaultRight = JSON.stringify({
+            "project": "JSON Master Pro",
+            "version": "1.0.0",
+            "notes": "Older version for diff comparison...",
+            "features": [
+                "Basic Editor"
+            ]
+        }, null, 2);
+
+        // Validate loaded data
+        if (savedLeft && safeParse(savedLeft)) {
+            setLeftInput(savedLeft);
+        } else {
+            setLeftInput(defaultLeft);
+        }
+
+        if (savedRight && safeParse(savedRight)) {
+            setRightInput(savedRight);
+        } else {
+            setRightInput(defaultRight);
         }
     }, []);
 
+    // ... (rest of local storage effects)
     useEffect(() => {
-        if (input) {
-            localStorage.setItem('json-master-input', input);
-        }
+        localStorage.setItem('json-master-left', leftInput);
+    }, [leftInput]);
 
-        if (!input.trim()) {
-            setStatus('idle');
-            setErrorMessage('');
+    useEffect(() => {
+        localStorage.setItem('json-master-right', rightInput);
+    }, [rightInput]);
+
+    const handleSwap = () => {
+        const temp = leftInput;
+        setLeftInput(rightInput);
+        setRightInput(temp);
+        toast.success('Swapped contents');
+    };
+
+    const copyToRight = () => {
+        setRightInput(leftInput);
+        toast.success('Copied Left to Right');
+    };
+
+    const copyToLeft = () => {
+        setLeftInput(rightInput);
+        toast.success('Copied Right to Left');
+    };
+
+    const openTransform = (pane: 'left' | 'right') => {
+        const input = pane === 'left' ? leftInput : rightInput;
+        if (!safeParse(input)) {
+            toast.error('Invalid JSON - cannot transform');
             return;
         }
-        const { valid, error } = validateJson(input);
-        if (valid) {
-            setStatus('valid');
-            setErrorMessage('');
-        } else {
-            setStatus('invalid');
-            setErrorMessage(error || 'Invalid JSON');
-        }
-    }, [input]);
-
-    const handleEditorDidMount: OnMount = (editor, monaco) => {
-        editorRef.current = editor;
+        setActivePane(pane);
+        setTransformOpen(true);
     };
 
-    const handleFormat = () => {
-        try {
-            const formatted = formatJson(input);
-            setInput(formatted);
-            toast.success('Formatted', { icon: '✨' });
-        } catch (e) {
-            toast.error('Invalid JSON');
-        }
+    const handleTransformApply = (result: string) => {
+        if (activePane === 'left') setLeftInput(result);
+        else setRightInput(result);
     };
 
-    const handleMinify = () => {
-        try {
-            const minified = minifyJson(input);
-            setInput(minified);
-            toast.success('Minified', { icon: '📦' });
-        } catch (e) {
-            toast.error('Invalid JSON');
-        }
-    };
-
-    const handleFix = () => {
-        const fixed = fixJson(input);
-        if (fixed !== input) {
-            setInput(fixed);
-            toast.success('Auto-fixed errors', { icon: '🔧' });
-        } else {
-            toast('No fixes applied', { icon: 'ℹ️' });
-        }
-    };
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(input);
-        toast.success('Copied input');
-    };
-
-    const handleClear = () => {
-        if (confirm('Clear editor?')) {
-            setInput('');
-            localStorage.removeItem('json-master-input');
-            toast.success('Cleared');
-        }
-    }
+    // ... (handlers)
 
     return (
-        <div className="flex flex-col h-full w-full gap-4 lg:gap-6" style={{ minHeight: '100%' }}>
+        <div className="flex flex-col h-full w-full overflow-hidden">
             <Toaster position="bottom-right" toastOptions={{
                 style: {
                     background: 'hsl(var(--color-surface))',
@@ -106,112 +190,100 @@ export default function JsonEditor() {
                 }
             }} />
 
-            {/* Main Toolbar */}
-            <div className="card p-2 flex flex-col sm:flex-row items-center justify-between gap-4 bg-[hsl(var(--color-surface))]/80 backdrop-blur-md">
-                <div className="flex items-center gap-4 w-full sm:w-auto overflow-x-auto no-scrollbar">
-                    <div className={`
-                        flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-lg transition-all duration-300 border
-                        ${status === 'valid'
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-lg shadow-emerald-500/10'
-                            : status === 'invalid'
-                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-lg shadow-rose-500/10 animate-pulse'
-                                : 'bg-[hsl(var(--color-surface-hover))] border-[hsl(var(--color-border))] text-[hsl(var(--color-text-muted))]'}
-                     `}>
-                        {status === 'valid' && <CheckCircle size={16} />}
-                        {status === 'invalid' && <AlertOctagon size={16} />}
-                        {status === 'idle' && <Command size={16} />}
-                        <span className="uppercase tracking-wider">{status === 'idle' ? 'Ready' : status === 'valid' ? 'Valid JSON' : 'Syntax Error'}</span>
-                    </div>
+            <TransformModal
+                isOpen={transformOpen}
+                onClose={() => setTransformOpen(false)}
+                data={safeParse(activePane === 'left' ? leftInput : rightInput)}
+                onApply={handleTransformApply}
+            />
 
-                    <div className="w-px h-8 bg-[hsl(var(--color-border))] mx-2 hidden sm:block"></div>
-                    <FileControls onLoadContent={setInput} currentContent={input} />
-                </div>
-
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                    <button
-                        onClick={handleFix}
-                        className="btn btn-primary gap-2 text-xs py-2 px-4 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 relative group overflow-hidden"
-                        title="Auto Fix JSON"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-shimmer"></div>
-                        <span className="relative flex items-center gap-2"><Sparkles size={16} /> Auto Fix</span>
-                    </button>
-
-                    <div className="w-px h-8 bg-[hsl(var(--color-border))] mx-2 hidden sm:block"></div>
-
-                    <div className="flex bg-[hsl(var(--color-background))] rounded-lg p-1 border border-[hsl(var(--color-border))]">
-                        <button onClick={handleFormat} className="icon-btn" disabled={status === 'invalid'} title="Format (Prettify)">
-                            <AlignLeft size={18} />
-                        </button>
-                        <button onClick={handleMinify} className="icon-btn" disabled={status === 'invalid'} title="Minify (Compress)">
-                            <Minimize size={18} />
-                        </button>
-                        <button onClick={handleCopy} className="icon-btn" title="Copy Input">
-                            <Copy size={18} />
-                        </button>
-                        <button onClick={handleClear} className="icon-btn text-rose-400 hover:text-rose-500 hover:bg-rose-950/30" title="Clear All">
-                            <Eraser size={18} />
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Editor Area */}
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6" style={{ minHeight: 'calc(100vh - 200px)' }}>
-                {/* Input Pane */}
-                <div className="flex flex-col card border-0 p-0 overflow-hidden relative group bg-[hsl(var(--color-background))]/50" style={{ height: '100%', minHeight: '500px' }}>
-                    <div className="flex justify-between items-center text-xs font-medium text-[hsl(var(--color-text-muted))] px-4 py-2.5 bg-[hsl(var(--color-surface))] border-b border-[hsl(var(--color-border))]">
-                        <span className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${status === 'invalid' ? 'bg-rose-500' : 'bg-indigo-500'} shadow-[0_0_8px_rgba(99,102,241,0.5)]`}></div>
-                            INPUT
-                        </span>
-                        <span className="font-mono bg-[hsl(var(--color-background))] px-2 py-0.5 rounded text-[10px] border border-[hsl(var(--color-border))]">
-                            {input.length.toLocaleString()} chars
-                        </span>
-                    </div>
-
-                    <div className="flex-1 relative bg-[hsl(var(--color-background))]" style={{ minHeight: '400px', overflow: 'hidden' }}>
-                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-                            <Editor
-                                height="100%"
-                                defaultLanguage="json"
-                                theme="vs-dark"
-                                value={input}
-                                onChange={(value) => setInput(value || '')}
-                                onMount={handleEditorDidMount}
-                                options={{
-                                    minimap: { enabled: false },
-                                    fontSize: 13,
-                                    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                                    wordWrap: 'on',
-                                    formatOnPaste: true,
-                                    automaticLayout: true,
-                                    padding: { top: 20, bottom: 20 },
-                                    scrollBeyondLastLine: false,
-                                    renderLineHighlight: 'all',
-                                    smoothScrolling: true,
-                                    cursorBlinking: 'smooth',
-                                    cursorSmoothCaretAnimation: 'on',
-                                    guides: { indentation: true },
-                                    scrollbar: { vertical: 'visible', verticalScrollbarSize: 10 }
-                                }}
+            {/* Main Editor Area */}
+            <div
+                className="flex-1 min-h-0 relative"
+                ref={containerRef}
+                style={{ flex: '1 1 0%', minHeight: 0 }}
+            >
+                {layoutMode === 'split' ? (
+                    <div className="absolute inset-0 flex flex-row pt-2 pb-0">
+                        {/* Left Editor */}
+                        <div style={{ width: `${splitRatio}%` }} className="min-w-0 pr-1 h-full relative">
+                            <EditorPane
+                                title="Document 1"
+                                value={leftInput}
+                                onChange={setLeftInput}
+                                headerColor="emerald"
+                                onTransform={() => openTransform('left')}
+                                validationStatus={leftVal.status}
                             />
                         </div>
-                    </div>
 
-                    {errorMessage && (
-                        <div className="absolute bottom-4 left-4 right-4 p-3 bg-rose-500/10 text-rose-200 text-xs font-mono border border-rose-500/20 backdrop-blur-xl rounded-lg flex items-start gap-3 shadow-xl animate-in fade-in slide-in-from-bottom-2 duration-200">
-                            <AlertTriangle size={16} className="text-rose-500 shrink-0 mt-0.5" />
-                            <div className="break-all">{errorMessage}</div>
+                        {/* Draggable Handle & Controls */}
+                        <div
+                            className="w-2 flex flex-col items-center justify-center relative z-10 cursor-col-resize group hover:bg-[hsl(var(--color-surface-hover))]"
+                            onMouseDown={handleMouseDown}
+                        >
+                            <div className={`absolute inset-y-0 left-1/2 w-0.5 bg-[hsl(var(--color-border))] transition-colors ${isDragging ? 'bg-indigo-500' : 'group-hover:bg-indigo-500'}`}></div>
+
+                            {/* Central Controls (Floating over handle) */}
+                            <div className="absolute top-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-2 text-[hsl(var(--color-text-muted))] bg-[hsl(var(--color-background))] py-2 border border-[hsl(var(--color-border))] rounded-full shadow-xl pointer-events-auto cursor-default z-20">
+                                <button onClick={copyToRight} className="p-1.5 rounded-full hover:bg-[hsl(var(--color-surface-hover))] hover:text-[hsl(var(--color-text-main))] transition-colors" title="Copy to Right">
+                                    <ArrowRight size={14} />
+                                </button>
+                                <button onClick={handleSwap} className="p-1.5 rounded-full hover:bg-[hsl(var(--color-surface-hover))] hover:text-[hsl(var(--color-text-main))] transition-colors" title="Swap">
+                                    <ArrowRightLeft size={14} />
+                                </button>
+                                <button onClick={copyToLeft} className="p-1.5 rounded-full hover:bg-[hsl(var(--color-surface-hover))] hover:text-[hsl(var(--color-text-main))] transition-colors" title="Copy to Left">
+                                    <ArrowLeft size={14} />
+                                </button>
+                            </div>
                         </div>
-                    )}
-                </div>
 
-                {/* Tools Pane */}
-                <div style={{ height: '100%', minHeight: '500px' }}>
-                    <ToolsPanel jsonInput={input} isValid={status === 'valid'} />
-                </div>
+                        {/* Right Editor */}
+                        <div style={{ width: `${100 - splitRatio}%` }} className="min-w-0 pl-1 h-full relative">
+                            <EditorPane
+                                title="Document 2"
+                                value={rightInput}
+                                onChange={setRightInput}
+                                headerColor="indigo"
+                                onTransform={() => openTransform('right')}
+                                validationStatus={rightVal.status}
+                            />
+                        </div>
+
+                        {/* Drag Overlay */}
+                        {isDragging && <div className="fixed inset-0 z-50 cursor-col-resize"></div>}
+                    </div>
+                ) : (
+                    <div className="absolute inset-0 card p-0 overflow-hidden bg-[hsl(var(--color-background))] border border-[hsl(var(--color-border))] mt-2">
+                        <DiffEditor
+                            height="100%"
+                            original={leftInput}
+                            modified={rightInput}
+                            language="json"
+                            theme="vs-dark"
+                            options={{
+                                renderSideBySide: true,
+                                readOnly: true,
+                                minimap: { enabled: false },
+                                fontSize: 13,
+                                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                                padding: { top: 20, bottom: 20 },
+                                scrollBeyondLastLine: false,
+                            }}
+                        />
+                    </div>
+                )}
             </div>
+
+            {/* Status Bar */}
+            <StatusBar
+                leftStatus={leftVal.status}
+                leftError={leftVal.error}
+                rightStatus={rightVal.status}
+                rightError={rightVal.error}
+                leftStats={leftStats}
+                rightStats={rightStats}
+            />
         </div>
     );
 }
