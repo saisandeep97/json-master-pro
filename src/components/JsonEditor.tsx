@@ -1,16 +1,30 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { DiffEditor } from '@monaco-editor/react';
 import toast, { Toaster } from 'react-hot-toast';
-import { ArrowRightLeft, ArrowRight, ArrowLeft } from 'lucide-react';
+import { X, ArrowRight, Check, Sparkles } from 'lucide-react';
 import { useGlobal } from '@/context/GlobalContext';
 
 import EditorPane from './EditorPane';
 import StatusBar from './StatusBar';
 import TransformModal from './TransformModal';
 
-// Helper for safe transformation input
+// Default sample JSON
+const DEFAULT_JSON = `{
+  "name": "JSON Master Pro",
+  "version": "1.0.0",
+  "features": [
+    "Format & Validate",
+    "Transform & Filter",
+    "Compare & Diff"
+  ],
+  "settings": {
+    "theme": "dark",
+    "autoFormat": true
+  }
+}`;
+
 const safeParse = (input: string) => {
     try {
         return JSON.parse(input);
@@ -32,159 +46,80 @@ const useValidation = (json: string) => {
 };
 
 export default function JsonEditor() {
-    const { layoutMode } = useGlobal();
-    const [leftInput, setLeftInput] = useState('');
-    const [rightInput, setRightInput] = useState('');
+    const { layoutMode, theme } = useGlobal();
+    const [input, setInput] = useState(DEFAULT_JSON);
+    const [resultInput, setResultInput] = useState('');
+    const [showResult, setShowResult] = useState(false);
+
+    // For diff view - second input
+    const [diffInput, setDiffInput] = useState('');
 
     // Validation
-    const leftVal = useValidation(leftInput);
-    const rightVal = useValidation(rightInput);
+    const inputVal = useValidation(input);
+    const resultVal = useValidation(resultInput);
+    const diffVal = useValidation(diffInput);
 
     // Transform State
     const [transformOpen, setTransformOpen] = useState(false);
-    const [activePane, setActivePane] = useState<'left' | 'right'>('left');
 
-    // Resize State
-    const [splitRatio, setSplitRatio] = useState(50);
-    const [isDragging, setIsDragging] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
+    // Stats
+    const inputStats = useMemo(() => {
+        const bytes = new Blob([input]).size;
+        const size = bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
+        return { size, length: input.length };
+    }, [input]);
 
-    // Resize Logic
-    const handleMouseDown = (e: React.MouseEvent) => {
-        e.preventDefault();
-        setIsDragging(true);
+    const resultStats = useMemo(() => {
+        const bytes = new Blob([resultInput]).size;
+        const size = bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
+        return { size, length: resultInput.length };
+    }, [resultInput]);
+
+    // Handle transform result - opens result panel
+    const handleTransformApply = (result: string) => {
+        setResultInput(result);
+        setShowResult(true);
     };
 
-    useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
-            if (!isDragging || !containerRef.current) return;
-
-            const containerRect = containerRef.current.getBoundingClientRect();
-            const newRatio = ((e.clientX - containerRect.left) / containerRect.width) * 100;
-
-            // Limit ratio between 20% and 80%
-            if (newRatio >= 20 && newRatio <= 80) {
-                setSplitRatio(newRatio);
-            }
-        };
-
-        const handleMouseUp = () => {
-            setIsDragging(false);
-        };
-
-        if (isDragging) {
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
-        }
-
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [isDragging]);
-
-    const getStats = (text: string) => {
-        if (!text) return { size: '0 B', length: 0 };
-        const bytes = new TextEncoder().encode(text).length;
-        const size = bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(2)} KB`;
-        return { size, length: text.length };
+    // Handle auto-fix output
+    const handleAutoFixOutput = (fixed: string) => {
+        setResultInput(fixed);
+        setShowResult(true);
     };
 
-    const leftStats = useMemo(() => getStats(leftInput), [leftInput]);
-    const rightStats = useMemo(() => getStats(rightInput), [rightInput]);
-
-    useEffect(() => {
-        const savedLeft = localStorage.getItem('json-master-left');
-        const savedRight = localStorage.getItem('json-master-right');
-
-        const defaultLeft = JSON.stringify({
-            "project": "JSON Master Pro",
-            "version": "2.0.0",
-            "features": [
-                "Dual Pane Editor",
-                "Tree View Visualization",
-                "Smart JSON Fixer",
-                "Dark/Light Theme"
-            ],
-            "settings": {
-                "theme": "dark",
-                "notifications": true
-            }
-        }, null, 2);
-
-        const defaultRight = JSON.stringify({
-            "project": "JSON Master Pro",
-            "version": "1.0.0",
-            "notes": "Older version for diff comparison...",
-            "features": [
-                "Basic Editor"
-            ]
-        }, null, 2);
-
-        // Validate loaded data
-        if (savedLeft && safeParse(savedLeft)) {
-            setLeftInput(savedLeft);
-        } else {
-            setLeftInput(defaultLeft);
-        }
-
-        if (savedRight && safeParse(savedRight)) {
-            setRightInput(savedRight);
-        } else {
-            setRightInput(defaultRight);
-        }
-    }, []);
-
-    // ... (rest of local storage effects)
-    useEffect(() => {
-        localStorage.setItem('json-master-left', leftInput);
-    }, [leftInput]);
-
-    useEffect(() => {
-        localStorage.setItem('json-master-right', rightInput);
-    }, [rightInput]);
-
-    const handleSwap = () => {
-        const temp = leftInput;
-        setLeftInput(rightInput);
-        setRightInput(temp);
-        toast.success('Swapped contents');
+    // Use result as main input
+    const handleUseResult = () => {
+        setInput(resultInput);
+        setShowResult(false);
+        setResultInput('');
+        toast.success('Result applied to editor');
     };
 
-    const copyToRight = () => {
-        setRightInput(leftInput);
-        toast.success('Copied Left to Right');
+    // Close result panel
+    const handleCloseResult = () => {
+        setShowResult(false);
     };
 
-    const copyToLeft = () => {
-        setLeftInput(rightInput);
-        toast.success('Copied Right to Left');
-    };
-
-    const openTransform = (pane: 'left' | 'right') => {
-        const input = pane === 'left' ? leftInput : rightInput;
+    // Open transform
+    const openTransform = () => {
         if (!safeParse(input)) {
             toast.error('Invalid JSON - cannot transform');
             return;
         }
-        setActivePane(pane);
         setTransformOpen(true);
     };
 
-    const handleTransformApply = (result: string) => {
-        if (activePane === 'left') setLeftInput(result);
-        else setRightInput(result);
-    };
-
-    // ... (handlers)
+    // Monaco theme based on global theme
+    const monacoTheme = theme === 'dark' ? 'vs-dark' : 'light';
 
     return (
         <div className="flex flex-col h-full w-full overflow-hidden">
             <Toaster position="bottom-right" toastOptions={{
                 style: {
-                    background: 'hsl(var(--color-surface))',
-                    color: 'hsl(var(--color-text-main))',
-                    border: '1px solid hsl(var(--color-border))',
+                    background: theme === 'dark' ? '#1e293b' : '#fff',
+                    color: theme === 'dark' ? '#f1f5f9' : '#1e293b',
+                    border: '1px solid',
+                    borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
                     fontFamily: 'var(--font-mono)',
                     fontSize: '12px'
                 }
@@ -193,112 +128,132 @@ export default function JsonEditor() {
             <TransformModal
                 isOpen={transformOpen}
                 onClose={() => setTransformOpen(false)}
-                data={safeParse(activePane === 'left' ? leftInput : rightInput)}
+                data={safeParse(input)}
                 onApply={handleTransformApply}
             />
 
             {/* Main Editor Area */}
             <div
-                className="flex-1 min-h-0 relative"
-                ref={containerRef}
-                style={{ flex: '1 1 0%', minHeight: 0 }}
+                className="relative flex-1 min-h-0 p-3"
+                style={{ height: 'calc(100% - 32px)' }}
             >
-                {layoutMode === 'split' ? (
-                    <div className="absolute inset-0 flex flex-row gap-0 pt-2 pb-0">
-                        {/* Left Editor */}
-                        <div style={{ width: `calc(${splitRatio}% - 24px)` }} className="min-w-0 h-full">
-                            <EditorPane
-                                title="Document 1"
-                                value={leftInput}
-                                onChange={setLeftInput}
-                                headerColor="emerald"
-                                onTransform={() => openTransform('left')}
-                                validationStatus={leftVal.status}
-                            />
-                        </div>
-
-                        {/* Center Column with Controls */}
-                        <div style={{ width: 48, minWidth: 48, flexShrink: 0 }} className="h-full flex flex-col items-center relative">
-                            {/* Resize Handle Background */}
-                            <div
-                                className="absolute inset-0 cursor-col-resize group"
-                                onMouseDown={handleMouseDown}
-                            >
-                                {/* Center Line */}
-                                <div className={`absolute top-0 bottom-0 left-1/2 w-[2px] -translate-x-1/2 transition-all duration-200 ${isDragging ? 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]' : 'bg-[hsl(var(--color-border))] group-hover:bg-indigo-500/50'}`}></div>
+                {layoutMode === 'diff' ? (
+                    /* Diff View - Monaco DiffEditor for proper highlighting */
+                    <div className="h-full rounded-xl border border-slate-700 overflow-hidden bg-slate-900">
+                        <div className="flex items-center px-4 py-2 bg-slate-800 border-b border-slate-700 gap-4">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Original</span>
                             </div>
-
-                            {/* Central Controls Panel */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1.5 bg-[hsl(var(--color-surface))] p-2 border border-[hsl(var(--color-border))] rounded-xl shadow-lg">
-                                <button
-                                    onClick={copyToRight}
-                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[hsl(var(--color-text-muted))] hover:bg-indigo-500 hover:text-white transition-all duration-200 group/btn"
-                                    title="Copy to Right"
-                                >
-                                    <ArrowRight size={16} className="group-hover/btn:translate-x-0.5 transition-transform" />
-                                </button>
-                                <button
-                                    onClick={handleSwap}
-                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[hsl(var(--color-text-muted))] hover:bg-indigo-500 hover:text-white transition-all duration-200 group/btn"
-                                    title="Swap Documents"
-                                >
-                                    <ArrowRightLeft size={16} className="group-hover/btn:rotate-180 transition-transform duration-300" />
-                                </button>
-                                <button
-                                    onClick={copyToLeft}
-                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[hsl(var(--color-text-muted))] hover:bg-indigo-500 hover:text-white transition-all duration-200 group/btn"
-                                    title="Copy to Left"
-                                >
-                                    <ArrowLeft size={16} className="group-hover/btn:-translate-x-0.5 transition-transform" />
-                                </button>
+                            <div className="flex-1 text-center text-xs text-slate-500">← differences are highlighted →</div>
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                                <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Modified</span>
                             </div>
                         </div>
-
-                        {/* Right Editor */}
-                        <div style={{ width: `calc(${100 - splitRatio}% - 24px)` }} className="min-w-0 h-full">
-                            <EditorPane
-                                title="Document 2"
-                                value={rightInput}
-                                onChange={setRightInput}
-                                headerColor="indigo"
-                                onTransform={() => openTransform('right')}
-                                validationStatus={rightVal.status}
+                        <div className="h-[calc(100%-40px)]">
+                            <DiffEditor
+                                height="100%"
+                                language="json"
+                                theme={monacoTheme}
+                                original={input}
+                                modified={diffInput}
+                                onMount={(editor) => {
+                                    // Get the modified editor and set onChange
+                                    const modifiedEditor = editor.getModifiedEditor();
+                                    modifiedEditor.onDidChangeModelContent(() => {
+                                        setDiffInput(modifiedEditor.getValue());
+                                    });
+                                    // Set initial value if empty
+                                    if (!diffInput) {
+                                        setDiffInput(input);
+                                    }
+                                }}
+                                options={{
+                                    renderSideBySide: true,
+                                    minimap: { enabled: false },
+                                    fontSize: 13,
+                                    lineNumbers: 'on',
+                                    scrollBeyondLastLine: false,
+                                    automaticLayout: true,
+                                    readOnly: false,
+                                    originalEditable: true,
+                                }}
                             />
                         </div>
-
-                        {/* Drag Overlay */}
-                        {isDragging && <div className="fixed inset-0 z-50 cursor-col-resize"></div>}
                     </div>
                 ) : (
-                    <div className="absolute inset-0 card p-0 overflow-hidden bg-[hsl(var(--color-background))] border border-[hsl(var(--color-border))] mt-2">
-                        <DiffEditor
-                            height="100%"
-                            original={leftInput}
-                            modified={rightInput}
-                            language="json"
-                            theme="vs-dark"
-                            options={{
-                                renderSideBySide: true,
-                                readOnly: true,
-                                minimap: { enabled: false },
-                                fontSize: 13,
-                                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                                padding: { top: 20, bottom: 20 },
-                                scrollBeyondLastLine: false,
-                            }}
-                        />
+                    /* Single Editor (default) + Result Panel */
+                    <div className="h-full flex gap-3">
+                        {/* Main Editor */}
+                        <div className={`${showResult ? 'w-1/2' : 'w-full'} min-w-0 transition-all duration-300`}>
+                            <EditorPane
+                                title="JSON Editor"
+                                value={input}
+                                onChange={setInput}
+                                headerColor="emerald"
+                                onTransform={openTransform}
+                                onAutoFixOutput={handleAutoFixOutput}
+                                validationStatus={inputVal.status}
+                            />
+                        </div>
+
+                        {/* Result Panel - slides in when needed */}
+                        {showResult && (
+                            <div className="w-1/2 min-w-0 animate-in slide-in-from-right duration-300">
+                                <div className="h-full flex flex-col bg-slate-900 rounded-xl border border-slate-700 overflow-hidden">
+                                    {/* Result Header */}
+                                    <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+                                        <div className="flex items-center gap-2">
+                                            <Sparkles size={18} />
+                                            <span className="font-bold text-sm">Result</span>
+                                            {resultVal.status === 'valid' && (
+                                                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                    <Check size={12} /> Valid
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={handleUseResult}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-medium transition-colors"
+                                            >
+                                                <ArrowRight size={14} /> Use This
+                                            </button>
+                                            <button
+                                                onClick={handleCloseResult}
+                                                className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
+                                            >
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {/* Result Editor */}
+                                    <div className="flex-1 min-h-0">
+                                        <EditorPane
+                                            title=""
+                                            value={resultInput}
+                                            onChange={setResultInput}
+                                            headerColor="indigo"
+                                            validationStatus={resultVal.status}
+                                            hideToolbar
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
 
             {/* Status Bar */}
             <StatusBar
-                leftStatus={leftVal.status}
-                leftError={leftVal.error}
-                rightStatus={rightVal.status}
-                rightError={rightVal.error}
-                leftStats={leftStats}
-                rightStats={rightStats}
+                leftStatus={inputVal.status}
+                leftError={inputVal.error}
+                rightStatus={showResult ? resultVal.status : diffVal.status}
+                rightError={showResult ? resultVal.error : diffVal.error}
+                leftStats={inputStats}
+                rightStats={showResult ? resultStats : undefined}
             />
         </div>
     );

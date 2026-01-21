@@ -2,8 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-type LayoutMode = 'split' | 'diff' | 'tree';
-type SidebarTab = 'editor' | 'diff' | 'transform' | 'settings';
+type LayoutMode = 'split' | 'diff';
+type SidebarTab = 'editor' | 'diff' | 'settings';
 type ThemeMode = 'dark' | 'light';
 
 interface GlobalContextType {
@@ -11,8 +11,6 @@ interface GlobalContextType {
     setLayoutMode: (mode: LayoutMode) => void;
     activeTab: SidebarTab;
     setActiveTab: (tab: SidebarTab) => void;
-    fontSize: number;
-    setFontSize: (size: number) => void;
     theme: ThemeMode;
     toggleTheme: () => void;
 }
@@ -22,7 +20,6 @@ const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
 export function GlobalProvider({ children }: { children: ReactNode }) {
     const [layoutMode, setLayoutMode] = useState<LayoutMode>('split');
     const [activeTab, setActiveTab] = useState<SidebarTab>('editor');
-    const [fontSize, setFontSize] = useState(13);
     const [theme, setTheme] = useState<ThemeMode>('dark');
 
     // Initialize Theme
@@ -30,10 +27,9 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
         const savedTheme = localStorage.getItem('json-master-theme') as ThemeMode;
         if (savedTheme) {
             setTheme(savedTheme);
-            if (savedTheme === 'dark') document.documentElement.classList.add('dark');
-            else document.documentElement.classList.remove('dark');
+            document.documentElement.classList.toggle('dark', savedTheme === 'dark');
         } else {
-            document.documentElement.classList.add('dark'); // Default to dark
+            document.documentElement.classList.add('dark');
         }
     }, []);
 
@@ -41,17 +37,8 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
         const newTheme = theme === 'dark' ? 'light' : 'dark';
         setTheme(newTheme);
         localStorage.setItem('json-master-theme', newTheme);
-
-        // Force DOM update
-        const root = document.documentElement;
-        if (newTheme === 'dark') {
-            root.classList.add('dark');
-            root.style.colorScheme = 'dark';
-        } else {
-            root.classList.remove('dark');
-            root.style.colorScheme = 'light';
-        }
-        console.log('Theme toggled to:', newTheme);
+        document.documentElement.classList.toggle('dark', newTheme === 'dark');
+        document.documentElement.style.colorScheme = newTheme;
     };
 
     return (
@@ -60,8 +47,6 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
             setLayoutMode,
             activeTab,
             setActiveTab,
-            fontSize,
-            setFontSize,
             theme,
             toggleTheme
         }}>

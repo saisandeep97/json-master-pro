@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import Editor from '@monaco-editor/react';
-import { Play, X, ArrowRight, Check, Sparkles, Filter, Braces, Code2 } from 'lucide-react';
+'use client';
+
+import { useState, useEffect, useMemo } from 'react';
+import { X, ArrowRight, Filter, ArrowUpDown, Layers, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
-import jmespath from 'jmespath';
+import { useGlobal } from '@/context/GlobalContext';
 
 interface TransformModalProps {
     isOpen: boolean;
@@ -11,222 +12,364 @@ interface TransformModalProps {
     onApply: (result: any) => void;
 }
 
-type QueryMode = 'javascript' | 'jmespath';
+type Operation = 'filter' | 'sort' | 'pick';
+type Operator = 'equals' | 'contains' | 'gt' | 'lt' | 'exists';
 
 export default function TransformModal({ isOpen, onClose, data, onApply }: TransformModalProps) {
-    const [mode, setMode] = useState<QueryMode>('javascript');
-    const [query, setQuery] = useState('data');
-    const [result, setResult] = useState('');
+    const { theme } = useGlobal();
+
+    // Operation state
+    const [operation, setOperation] = useState<Operation>('filter');
+
+    // Filter state
+    const [filterField, setFilterField] = useState('');
+    const [filterOperator, setFilterOperator] = useState<Operator>('contains');
+    const [filterValue, setFilterValue] = useState('');
+
+    // Sort state
+    const [sortField, setSortField] = useState('');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+    // Pick fields state
+    const [pickedFields, setPickedFields] = useState<string[]>([]);
+
+    // Result
+    const [result, setResult] = useState<any>(null);
     const [error, setError] = useState('');
 
-    useEffect(() => {
-        if (isOpen) {
-            // Reset default query based on mode when opening or changing mode
-            if (mode === 'javascript' && query === '') setQuery('data');
-            if (mode === 'jmespath' && query === '') setQuery('[*]');
-            runQuery(query, mode);
-        }
-    }, [isOpen, data]);
+    // Extract available fields from data
+    const availableFields = useMemo(() => {
+        if (!data) return [];
+        const items = Array.isArray(data) ? data : [data];
+        if (items.length === 0) return [];
+        const allKeys = new Set<string>();
+        items.forEach(item => {
+            if (item && typeof item === 'object') {
+                Object.keys(item).forEach(key => allKeys.add(key));
+            }
+        });
+        return Array.from(allKeys);
+    }, [data]);
 
-    const runQuery = (q: string, currentMode: QueryMode) => {
-        setQuery(q);
-        if (!q.trim()) {
-            setResult('');
+    // Auto-select first field when fields become available
+    useEffect(() => {
+        if (availableFields.length > 0 && !filterField) {
+            setFilterField(availableFields[0]);
+            setSortField(availableFields[0]);
+        }
+    }, [availableFields]);
+
+    // Run transformation whenever inputs change
+    useEffect(() => {
+        if (!isOpen || !data) return;
+        runTransform();
+    }, [isOpen, data, operation, filterField, filterOperator, filterValue, sortField, sortDirection, pickedFields]);
+
+    const runTransform = () => {
+        if (!data) {
+            setResult(null);
             setError('');
             return;
         }
 
         try {
-            let res;
-            if (currentMode === 'javascript') {
-                // Safe usage for client-side app tool
-                const func = new Function('data', `
-                    try {
-                        return ${q};
-                    } catch(e) {
-                         return (function() { ${q} })();
+            const items = Array.isArray(data) ? [...data] : [data];
+            let transformed = items;
+
+            if (operation === 'filter' && filterField) {
+                transformed = items.filter(item => {
+                    if (!item || typeof item !== 'object') return false;
+                    const val = item[filterField];
+                    if (val === undefined || val === null) return filterOperator === 'exists' ? false : false;
+
+                    const strVal = String(val).toLowerCase();
+                    const searchVal = filterValue.toLowerCase();
+
+                    switch (filterOperator) {
+                        case 'equals':
+                            return strVal === searchVal;
+                        case 'contains':
+                            return strVal.includes(searchVal);
+                        case 'gt':
+                            return Number(val) > Number(filterValue);
+                        case 'lt':
+                            return Number(val) < Number(filterValue);
+                        case 'exists':
+                            return true;
+                        default:
+                            return true;
                     }
-                `);
-                res = func(data);
-            } else {
-                // JMESPath Mode
-                res = jmespath.search(data, q);
+                });
             }
 
-            if (res === undefined) {
-                setResult('undefined');
-            } else {
-                setResult(JSON.stringify(res, null, 2));
+            if (operation === 'sort' && sortField) {
+                transformed = [...items].sort((a, b) => {
+                    const aVal = a?.[sortField];
+                    const bVal = b?.[sortField];
+
+                    // Handle numbers
+                    if (typeof aVal === 'number' && typeof bVal === 'number') {
+                        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+                    }
+
+                    // Handle strings
+                    const strA = String(aVal ?? '');
+                    const strB = String(bVal ?? '');
+                    return sortDirection === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
+                });
             }
+
+            if (operation === 'pick' && pickedFields.length > 0) {
+                transformed = items.map(item => {
+                    if (!item || typeof item !== 'object') return item;
+                    const picked: Record<string, any> = {};
+                    pickedFields.forEach(field => {
+                        if (field in item) picked[field] = item[field];
+                    });
+                    return picked;
+                });
+            }
+
+            // Return single object if original was not an array
+            const finalResult = !Array.isArray(data) && transformed.length === 1
+                ? transformed[0]
+                : transformed;
+
+            setResult(finalResult);
             setError('');
         } catch (e: any) {
-            setError(e.message);
+            setError(e.message || 'Transform error');
+            setResult(null);
         }
-    };
-
-    const handleModeChange = (newMode: QueryMode) => {
-        setMode(newMode);
-        const defaultQuery = newMode === 'jmespath' ? '[*]' : 'data';
-        setQuery(defaultQuery);
-        runQuery(defaultQuery, newMode);
-    };
-
-    const insertExample = (ex: string) => {
-        runQuery(ex, mode);
     };
 
     const handleApply = () => {
-        if (error) {
-            toast.error('Cannot apply invalid transformation');
+        if (error || result === null) {
+            toast.error('Cannot apply - no valid result');
             return;
         }
-        onApply(result);
+        onApply(JSON.stringify(result, null, 2));
         onClose();
-        toast.success('Transformation applied');
+        toast.success('Transformation applied to Document 2');
+    };
+
+    const togglePickedField = (field: string) => {
+        setPickedFields(prev =>
+            prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]
+        );
     };
 
     if (!isOpen) return null;
 
-    const examples = mode === 'javascript'
-        ? ['data.filter(x => x.id > 1)', 'data.map(x => x.name)', 'data.sort((a,b) => a.id - b.id)']
-        : ['[*].name', '[?id > `1`]', 'sort_by(@, &id)', '{Names: [*].name}'];
+    const resultPreview = result !== null
+        ? JSON.stringify(result, null, 2)
+        : error || 'No result';
+
+    const resultCount = Array.isArray(result) ? result.length : (result ? 1 : 0);
+    const originalCount = Array.isArray(data) ? data.length : (data ? 1 : 0);
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
-            <div className="w-full max-w-5xl bg-[hsl(var(--color-surface))] rounded-2xl shadow-2xl border border-[hsl(var(--color-border))] flex flex-col max-h-[85vh] overflow-hidden transform transition-all scale-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="w-full max-w-4xl bg-slate-900 rounded-2xl shadow-2xl border border-slate-700 flex flex-col max-h-[85vh] overflow-hidden">
 
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-[hsl(var(--color-border))]">
-                    <div className="flex items-center gap-4">
-                        <div>
-                            <h2 className="text-lg font-bold flex items-center gap-2"><Sparkles size={18} className="text-amber-400" /> Transform JSON</h2>
-                            <p className="text-xs text-[hsl(var(--color-text-muted))]">Process your data using JavaScript or JMESPath query language.</p>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700 bg-slate-800/50">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                            <Sparkles size={20} className="text-white" />
                         </div>
-
-                        {/* Mode Switcher */}
-                        <div className="flex bg-[hsl(var(--color-background))] rounded-lg p-1 border border-[hsl(var(--color-border))] ml-4">
-                            <button
-                                onClick={() => handleModeChange('javascript')}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${mode === 'javascript' ? 'bg-indigo-500 text-white shadow' : 'text-[hsl(var(--color-text-muted))] hover:bg-[hsl(var(--color-surface-hover))]'}`}
-                            >
-                                <Code2 size={14} /> JavaScript
-                            </button>
-                            <button
-                                onClick={() => handleModeChange('jmespath')}
-                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${mode === 'jmespath' ? 'bg-amber-500 text-white shadow' : 'text-[hsl(var(--color-text-muted))] hover:bg-[hsl(var(--color-surface-hover))]'}`}
-                            >
-                                <Filter size={14} /> JMESPath
-                            </button>
+                        <div>
+                            <h2 className="text-lg font-bold text-white">Transform JSON</h2>
+                            <p className="text-xs text-slate-400">Filter, sort, or pick fields from your data</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-[hsl(var(--color-surface-hover))] rounded-full transition-colors">
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-slate-700 rounded-lg transition-colors text-slate-400 hover:text-white"
+                    >
                         <X size={20} />
                     </button>
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 flex flex-col lg:flex-row min-h-0">
-                    {/* Query Section */}
-                    <div className="flex-1 flex flex-col border-b lg:border-b-0 lg:border-r border-[hsl(var(--color-border))]">
-                        <div className="px-4 py-2 bg-[hsl(var(--color-background))] text-xs font-bold text-[hsl(var(--color-text-muted))] uppercase tracking-wider border-b border-[hsl(var(--color-border))] flex justify-between items-center">
-                            <span>Query Expression</span>
-                            <a
-                                href={mode === 'javascript' ? "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array" : "https://jmespath.org/tutorial.html"}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[10px] font-mono text-indigo-400 hover:underline flex items-center gap-1"
-                            >
-                                {mode === 'javascript' ? 'JS Array Docs' : 'JMESPath Tutorial'} <ArrowRight size={10} />
-                            </a>
-                        </div>
-                        <div className="flex-1 relative min-h-[200px]">
-                            <Editor
-                                height="100%"
-                                defaultLanguage={mode === 'javascript' ? 'javascript' : 'mariadb'} // mariadb used for similar SQL-like highlighting for JMES
-                                theme="vs-dark"
-                                value={query}
-                                onChange={(val) => runQuery(val || '', mode)}
-                                options={{
-                                    minimap: { enabled: false },
-                                    fontSize: 14,
-                                    lineNumbers: 'off',
-                                    padding: { top: 16, bottom: 16 },
-                                    overviewRulerLanes: 0,
-                                    hideCursorInOverviewRuler: true,
-                                    scrollbar: { vertical: 'hidden' },
-                                    wordWrap: 'on',
-                                    renderLineHighlight: 'none'
-                                }}
-                            />
-                        </div>
+                <div className="flex-1 flex min-h-0 overflow-hidden">
+                    {/* Left Panel - Controls */}
+                    <div className="w-80 flex-shrink-0 border-r border-slate-700 p-5 overflow-y-auto bg-slate-800/30">
 
-                        {/* Wizard / Examples */}
-                        <div className="p-4 bg-[hsl(var(--color-background))]/50 border-t border-[hsl(var(--color-border))] text-xs">
-                            <span className="font-bold text-[hsl(var(--color-text-muted))] block mb-2 flex items-center gap-1"><Sparkles size={12} /> {mode === 'javascript' ? 'Common Operations' : 'Wizard Shortcuts'}</span>
-                            <div className="flex flex-wrap gap-2">
-                                {examples.map(ex => (
+                        {/* Operation Selector */}
+                        <div className="mb-6">
+                            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 block">Operation</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {[
+                                    { id: 'filter', label: 'Filter', icon: Filter, color: 'from-blue-500 to-cyan-500' },
+                                    { id: 'sort', label: 'Sort', icon: ArrowUpDown, color: 'from-purple-500 to-pink-500' },
+                                    { id: 'pick', label: 'Pick', icon: Layers, color: 'from-green-500 to-emerald-500' },
+                                ].map(op => (
                                     <button
-                                        key={ex}
-                                        onClick={() => insertExample(ex)}
-                                        className="px-3 py-1.5 bg-[hsl(var(--color-surface))] border border-[hsl(var(--color-border))] rounded-md cursor-pointer hover:border-indigo-500 hover:text-indigo-400 transition-colors code-font text-[11px]"
+                                        key={op.id}
+                                        onClick={() => setOperation(op.id as Operation)}
+                                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${operation === op.id
+                                                ? `bg-gradient-to-br ${op.color} border-transparent text-white shadow-lg`
+                                                : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-slate-500'
+                                            }`}
                                     >
-                                        {ex}
+                                        <op.icon size={22} />
+                                        <span className="text-xs font-medium">{op.label}</span>
                                     </button>
                                 ))}
                             </div>
                         </div>
+
+                        {/* Filter Options */}
+                        {operation === 'filter' && (
+                            <div className="space-y-4 p-4 bg-slate-800 rounded-xl border border-slate-700">
+                                <div>
+                                    <label className="text-xs text-slate-400 mb-2 block">Field to filter</label>
+                                    <select
+                                        value={filterField}
+                                        onChange={(e) => setFilterField(e.target.value)}
+                                        className="w-full px-3 py-2.5 bg-slate-900 border border-slate-600 rounded-lg text-sm text-white focus:border-blue-500 focus:outline-none"
+                                    >
+                                        {availableFields.map(f => <option key={f} value={f}>{f}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-400 mb-2 block">Condition</label>
+                                    <select
+                                        value={filterOperator}
+                                        onChange={(e) => setFilterOperator(e.target.value as Operator)}
+                                        className="w-full px-3 py-2.5 bg-slate-900 border border-slate-600 rounded-lg text-sm text-white focus:border-blue-500 focus:outline-none"
+                                    >
+                                        <option value="contains">Contains</option>
+                                        <option value="equals">Equals</option>
+                                        <option value="gt">Greater than</option>
+                                        <option value="lt">Less than</option>
+                                        <option value="exists">Exists (not null)</option>
+                                    </select>
+                                </div>
+                                {filterOperator !== 'exists' && (
+                                    <div>
+                                        <label className="text-xs text-slate-400 mb-2 block">Value</label>
+                                        <input
+                                            type="text"
+                                            value={filterValue}
+                                            onChange={(e) => setFilterValue(e.target.value)}
+                                            placeholder="Enter search value..."
+                                            className="w-full px-3 py-2.5 bg-slate-900 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Sort Options */}
+                        {operation === 'sort' && (
+                            <div className="space-y-4 p-4 bg-slate-800 rounded-xl border border-slate-700">
+                                <div>
+                                    <label className="text-xs text-slate-400 mb-2 block">Sort by field</label>
+                                    <select
+                                        value={sortField}
+                                        onChange={(e) => setSortField(e.target.value)}
+                                        className="w-full px-3 py-2.5 bg-slate-900 border border-slate-600 rounded-lg text-sm text-white focus:border-blue-500 focus:outline-none"
+                                    >
+                                        {availableFields.map(f => <option key={f} value={f}>{f}</option>)}
+                                    </select>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setSortDirection('asc')}
+                                        className={`flex-1 py-3 rounded-lg text-sm font-medium transition-all ${sortDirection === 'asc'
+                                                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                                                : 'bg-slate-900 border border-slate-600 text-slate-300'
+                                            }`}
+                                    >
+                                        ↑ Ascending
+                                    </button>
+                                    <button
+                                        onClick={() => setSortDirection('desc')}
+                                        className={`flex-1 py-3 rounded-lg text-sm font-medium transition-all ${sortDirection === 'desc'
+                                                ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                                                : 'bg-slate-900 border border-slate-600 text-slate-300'
+                                            }`}
+                                    >
+                                        ↓ Descending
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Pick Fields Options */}
+                        {operation === 'pick' && (
+                            <div className="p-4 bg-slate-800 rounded-xl border border-slate-700">
+                                <label className="text-xs text-slate-400 mb-3 block">Select fields to keep</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {availableFields.map(field => (
+                                        <button
+                                            key={field}
+                                            onClick={() => togglePickedField(field)}
+                                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${pickedFields.includes(field)
+                                                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                                                    : 'bg-slate-900 border border-slate-600 text-slate-300 hover:border-green-500/50'
+                                                }`}
+                                        >
+                                            {field}
+                                        </button>
+                                    ))}
+                                </div>
+                                {pickedFields.length === 0 && (
+                                    <p className="text-xs text-slate-500 mt-3">Click fields above to select them</p>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Stats */}
+                        <div className="mt-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-slate-400">Input items:</span>
+                                <span className="text-white font-medium">{originalCount}</span>
+                            </div>
+                            <div className="flex justify-between text-sm mt-2">
+                                <span className="text-slate-400">Output items:</span>
+                                <span className={`font-medium ${resultCount < originalCount ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                    {resultCount}
+                                </span>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Preview Section */}
-                    <div className="flex-1 flex flex-col bg-[hsl(var(--color-background))]">
-                        <div className="px-4 py-2 bg-[hsl(var(--color-background))] text-xs font-bold text-[hsl(var(--color-text-muted))] uppercase tracking-wider border-b border-[hsl(var(--color-border))] flex justify-between items-center">
-                            <span>Live Preview</span>
+                    {/* Right Panel - Preview */}
+                    <div className="flex-1 flex flex-col min-w-0 bg-slate-900">
+                        <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between bg-slate-800/30">
+                            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Live Preview</span>
                             {error ? (
-                                <span className="text-rose-400 flex items-center gap-1 bg-rose-500/10 px-2 py-0.5 rounded"><X size={12} /> Invalid Query</span>
+                                <span className="text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded">Error</span>
                             ) : (
-                                <span className="text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded"><Check size={12} /> Valid Result</span>
+                                <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded">Ready</span>
                             )}
                         </div>
-                        <div className="flex-1 relative min-h-[200px]">
-                            {error ? (
-                                <div className="absolute inset-0 p-4 text-rose-400 font-mono text-xs whitespace-pre-wrap">{error}</div>
-                            ) : (
-                                <Editor
-                                    height="100%"
-                                    defaultLanguage="json"
-                                    theme="vs-dark"
-                                    value={result}
-                                    options={{
-                                        readOnly: true,
-                                        minimap: { enabled: false },
-                                        fontSize: 12,
-                                        lineNumbers: 'off',
-                                        padding: { top: 16, bottom: 16 },
-                                        renderLineHighlight: 'none'
-                                    }}
-                                />
-                            )}
+                        <div className="flex-1 overflow-auto p-4">
+                            <pre className={`text-sm font-mono whitespace-pre-wrap ${error ? 'text-red-400' : 'text-slate-300'}`}>
+                                {resultPreview}
+                            </pre>
                         </div>
                     </div>
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-[hsl(var(--color-border))] bg-[hsl(var(--color-surface))] flex justify-between items-center gap-3">
-                    <span className="text-[10px] text-[hsl(var(--color-text-muted))]">
-                        {mode === 'javascript' ? 'Tip: Use data variable to access your JSON.' : 'Tip: Use @ to refer to the current node.'}
-                    </span>
-                    <div className="flex gap-3">
-                        <button onClick={onClose} className="px-4 py-2 text-xs font-medium text-[hsl(var(--color-text-muted))] hover:text-[hsl(var(--color-text-main))] transition-colors">
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleApply}
-                            disabled={!!error}
-                            className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-bold rounded-lg shadow-lg shadow-indigo-500/25 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                        >
-                            Apply Transformation <ArrowRight size={14} />
-                        </button>
-                    </div>
+                <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-700 bg-slate-800/50">
+                    <button
+                        onClick={onClose}
+                        className="px-4 py-2.5 text-sm font-medium text-slate-400 hover:text-white transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleApply}
+                        disabled={!!error || result === null}
+                        className="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-bold rounded-xl shadow-lg shadow-indigo-500/25 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                    >
+                        Apply to Document 2 <ArrowRight size={16} />
+                    </button>
                 </div>
             </div>
         </div>

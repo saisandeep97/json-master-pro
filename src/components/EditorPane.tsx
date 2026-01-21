@@ -2,11 +2,12 @@
 
 import { useRef, useState, useMemo } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
-import { AlignLeft, Minimize, Copy, Eraser, Command, Upload, Download, Wand2, Braces, Network, Wrench } from 'lucide-react';
+import { AlignLeft, Minimize, Copy, Eraser, Upload, Wand2, Braces, Network, Wrench, CheckCircle } from 'lucide-react';
 import { formatJson, minifyJson } from '@/lib/json-utils';
 import { fixJson } from '@/lib/json-fixer';
 import toast from 'react-hot-toast';
 import JsonTreeViewer from './JsonTreeViewer';
+import { useGlobal } from '@/context/GlobalContext';
 
 interface EditorPaneProps {
     title: string;
@@ -14,29 +15,33 @@ interface EditorPaneProps {
     onChange: (value: string) => void;
     readOnly?: boolean;
     headerColor?: string;
-    onLoadFile?: (content: string) => void;
     onTransform?: () => void;
+    onAutoFixOutput?: (result: string) => void;
     validationStatus?: 'idle' | 'valid' | 'invalid';
+    hideToolbar?: boolean;
 }
 
-export default function EditorPane({ title, value, onChange, readOnly = false, headerColor = 'indigo', onLoadFile, onTransform, validationStatus = 'idle' }: EditorPaneProps) {
+export default function EditorPane({
+    title,
+    value,
+    onChange,
+    readOnly = false,
+    headerColor = 'emerald',
+    onTransform,
+    onAutoFixOutput,
+    validationStatus = 'idle',
+    hideToolbar = false
+}: EditorPaneProps) {
+    const { theme } = useGlobal();
     const editorRef = useRef<any>(null);
     const [viewMode, setViewMode] = useState<'code' | 'tree'>('code');
 
-    // Safe Color Mapping for Tailwind
-    const colorMap: Record<string, string> = {
-        indigo: 'text-indigo-400 bg-indigo-500',
-        emerald: 'text-emerald-400 bg-emerald-500',
-        amber: 'text-amber-400 bg-amber-500',
-        rose: 'text-rose-400 bg-rose-500',
+    // Color mapping
+    const colors: Record<string, { dot: string; text: string }> = {
+        emerald: { dot: 'bg-emerald-500', text: 'text-emerald-400' },
+        indigo: { dot: 'bg-indigo-500', text: 'text-indigo-400' },
     };
-
-    // Extract text/bg colors safely
-    const themeClass = colorMap[headerColor] || colorMap['indigo'];
-    const textColor = themeClass.split(' ')[0];
-    const bgColor = themeClass.split(' ')[1];
-
-    // ... (rest of logic)
+    const color = colors[headerColor] || colors.emerald;
 
     // Parse JSON for Tree View
     const parsedData = useMemo(() => {
@@ -48,18 +53,15 @@ export default function EditorPane({ title, value, onChange, readOnly = false, h
         }
     }, [value, viewMode]);
 
-    const handleEditorDidMount: OnMount = (editor, monaco) => {
+    const handleEditorDidMount: OnMount = (editor) => {
         editorRef.current = editor;
     };
 
-    const handleChange = (val: string | undefined) => {
-        onChange(val || '');
-    };
+    const handleChange = (val: string | undefined) => onChange(val || '');
 
     const handleFormat = () => {
         try {
-            const formatted = formatJson(value);
-            onChange(formatted);
+            onChange(formatJson(value));
             toast.success('Formatted');
         } catch {
             toast.error('Invalid JSON');
@@ -68,8 +70,7 @@ export default function EditorPane({ title, value, onChange, readOnly = false, h
 
     const handleMinify = () => {
         try {
-            const minified = minifyJson(value);
-            onChange(minified);
+            onChange(minifyJson(value));
             toast.success('Minified');
         } catch {
             toast.error('Invalid JSON');
@@ -80,9 +81,25 @@ export default function EditorPane({ title, value, onChange, readOnly = false, h
         const fixed = fixJson(value);
         if (fixed === value) {
             toast('No obvious fixes found', { icon: '🤔' });
+        } else if (onAutoFixOutput) {
+            onAutoFixOutput(fixed);
+            toast.success('Fixed JSON placed in Result panel');
         } else {
             onChange(fixed);
             toast.success('Auto-fix applied');
+        }
+    };
+
+    const handleValidate = () => {
+        if (!value.trim()) {
+            toast('Empty input', { icon: '📝' });
+            return;
+        }
+        try {
+            JSON.parse(value);
+            toast.success('Valid JSON ✓');
+        } catch (e: any) {
+            toast.error(e.message || 'Invalid JSON', { duration: 5000 });
         }
     };
 
@@ -92,10 +109,8 @@ export default function EditorPane({ title, value, onChange, readOnly = false, h
     };
 
     const handleClear = () => {
-        if (confirm('Clear this editor?')) {
-            onChange('');
-            toast.success('Cleared');
-        }
+        onChange('');
+        toast.success('Cleared');
     };
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,110 +118,112 @@ export default function EditorPane({ title, value, onChange, readOnly = false, h
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (e) => {
-            const content = e.target?.result as string;
-            if (onLoadFile) onLoadFile(content);
-            else onChange(content);
+            onChange(e.target?.result as string);
             toast.success('File loaded');
         };
         reader.readAsText(file);
-        // Reset input
         e.target.value = '';
     };
 
     return (
-        <div
-            className="card border-0 p-0 overflow-hidden group bg-[hsl(var(--color-background))]/50"
-            style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%', position: 'relative' }}
-        >
-            {/* Header / Toolbar */}
-            <div
-                className="flex justify-between items-center px-4 py-2.5 bg-[hsl(var(--color-surface))] border-b border-[hsl(var(--color-border))]"
-                style={{ flexShrink: 0 }}
-            >
-                {/* Title and View Mode */}
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.5)] ${bgColor}`}></div>
-                        <span className={`font-bold text-xs uppercase tracking-wider ${textColor}`}>
-                            {title}
-                        </span>
+        <div className="h-full w-full flex flex-col rounded-xl border border-slate-700 overflow-hidden bg-slate-900">
+            {/* Toolbar */}
+            {!hideToolbar && (
+                <div className="flex justify-between items-center px-4 py-2.5 bg-slate-800 border-b border-slate-700 shrink-0">
+                    {/* Left: Title + View Toggle */}
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${color.dot} shadow-lg`}></div>
+                            <span className={`font-bold text-xs uppercase tracking-wider ${color.text}`}>
+                                {title}
+                            </span>
+                        </div>
+
+                        <div className="h-4 w-px bg-slate-700"></div>
+
+                        <div className="flex bg-slate-900 rounded-md p-0.5 border border-slate-700">
+                            <button
+                                onClick={() => setViewMode('code')}
+                                className={`px-2.5 py-1 text-[10px] rounded flex items-center gap-1.5 transition-all ${viewMode === 'code'
+                                        ? 'bg-slate-700 text-white font-bold'
+                                        : 'text-slate-400 hover:text-white'
+                                    }`}
+                            >
+                                <Braces size={13} /> Code
+                            </button>
+                            <button
+                                onClick={() => setViewMode('tree')}
+                                className={`px-2.5 py-1 text-[10px] rounded flex items-center gap-1.5 transition-all ${viewMode === 'tree'
+                                        ? 'bg-slate-700 text-white font-bold'
+                                        : 'text-slate-400 hover:text-white'
+                                    }`}
+                            >
+                                <Network size={13} /> Tree
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="h-4 w-px bg-[hsl(var(--color-border))]"></div>
+                    {/* Right: Tools */}
+                    <div className="flex items-center gap-3">
+                        {validationStatus === 'invalid' && (
+                            <button
+                                onClick={handleAutoFix}
+                                className="h-7 px-3 bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-white border border-amber-500/30 rounded-md text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 transition-all"
+                            >
+                                <Wrench size={12} /> Auto Fix
+                            </button>
+                        )}
 
-                    <div className="flex bg-[hsl(var(--color-background))] rounded-md p-0.5 border border-[hsl(var(--color-border))]">
-                        <button
-                            onClick={() => setViewMode('code')}
-                            className={`px-2.5 py-1 text-[10px] rounded-[4px] transition-all flex items-center gap-1.5 ${viewMode === 'code' ? 'bg-[hsl(var(--color-surface-hover))] text-[hsl(var(--color-text-main))] font-bold shadow-sm ring-1 ring-black/5 dark:ring-white/5' : 'text-[hsl(var(--color-text-muted))] hover:text-[hsl(var(--color-text-main))]'}`}
-                            title="Code View"
-                        >
-                            <Braces size={13} /> Code
-                        </button>
-                        <button
-                            onClick={() => setViewMode('tree')}
-                            className={`px-2.5 py-1 text-[10px] rounded-[4px] transition-all flex items-center gap-1.5 ${viewMode === 'tree' ? 'bg-[hsl(var(--color-surface-hover))] text-[hsl(var(--color-text-main))] font-bold shadow-sm ring-1 ring-black/5 dark:ring-white/5' : 'text-[hsl(var(--color-text-muted))] hover:text-[hsl(var(--color-text-main))]'}`}
-                            title="Tree View"
-                        >
-                            <Network size={13} /> Tree
-                        </button>
+                        {/* Tool Buttons */}
+                        <div className="flex items-center bg-slate-900 rounded-lg border border-slate-700 p-0.5">
+                            <button onClick={handleValidate} className="p-2 text-emerald-400 hover:bg-emerald-500/10 rounded-md transition-colors" title="Validate">
+                                <CheckCircle size={17} />
+                            </button>
+                            <div className="w-px h-4 bg-slate-700 mx-0.5"></div>
+                            <button onClick={handleFormat} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="Format">
+                                <AlignLeft size={17} />
+                            </button>
+                            <div className="w-px h-4 bg-slate-700 mx-0.5"></div>
+                            <button onClick={handleMinify} className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="Minify">
+                                <Minimize size={17} />
+                            </button>
+                            {onTransform && (
+                                <>
+                                    <div className="w-px h-4 bg-slate-700 mx-0.5"></div>
+                                    <button onClick={onTransform} className="p-2 text-indigo-400 hover:bg-indigo-500/10 rounded-md transition-colors" title="Transform">
+                                        <Wand2 size={17} />
+                                    </button>
+                                </>
+                            )}
+                        </div>
+
+                        <div className="h-4 w-px bg-slate-700"></div>
+
+                        {/* Meta Actions */}
+                        <div className="flex items-center gap-1">
+                            <label className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md cursor-pointer transition-colors" title="Load File">
+                                <input type="file" className="hidden" accept=".json,.txt" onChange={handleFileUpload} />
+                                <Upload size={16} />
+                            </label>
+                            <button onClick={handleCopy} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors" title="Copy">
+                                <Copy size={16} />
+                            </button>
+                            <button onClick={handleClear} className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition-colors" title="Clear">
+                                <Eraser size={16} />
+                            </button>
+                        </div>
                     </div>
                 </div>
-
-                <div className="flex items-center gap-3">
-                    {validationStatus === 'invalid' && (
-                        <button
-                            onClick={handleAutoFix}
-                            className="h-7 px-3 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-white border border-amber-500/20 rounded-md text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 transition-all animate-in fade-in slide-in-from-right-4"
-                            title="Auto Fix Common Errors"
-                        >
-                            <Wrench size={12} /> Auto Fix
-                        </button>
-                    )}
-
-                    {/* Tools Group */}
-                    <div className="flex items-center bg-[hsl(var(--color-background))] rounded-md border border-[hsl(var(--color-border))] p-0.5 shadow-sm">
-                        <button onClick={handleFormat} className="p-1.5 text-[hsl(var(--color-text-muted))] hover:text-[hsl(var(--color-text-main))] hover:bg-[hsl(var(--color-surface-hover))] rounded transition-colors group/tool" title="Format JSON">
-                            <AlignLeft size={15} className="group-hover/tool:scale-105 transition-transform" />
-                        </button>
-                        <div className="w-px h-3.5 bg-[hsl(var(--color-border))] mx-0.5"></div>
-                        <button onClick={handleMinify} className="p-1.5 text-[hsl(var(--color-text-muted))] hover:text-[hsl(var(--color-text-main))] hover:bg-[hsl(var(--color-surface-hover))] rounded transition-colors group/tool" title="Minify JSON">
-                            <Minimize size={15} className="group-hover/tool:scale-105 transition-transform" />
-                        </button>
-                        <div className="w-px h-3.5 bg-[hsl(var(--color-border))] mx-0.5"></div>
-                        <button onClick={onTransform} className="p-1.5 text-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-500/10 rounded transition-colors group/tool" title="Transform (Query)">
-                            <Wand2 size={15} className="group-hover/tool:rotate-12 transition-transform" />
-                        </button>
-                    </div>
-
-                    <div className="h-4 w-px bg-[hsl(var(--color-border))]"></div>
-
-                    {/* Meta Actions */}
-                    <div className="flex items-center gap-1">
-                        <label className="p-1.5 text-[hsl(var(--color-text-muted))] hover:text-[hsl(var(--color-text-main))] hover:bg-[hsl(var(--color-surface-hover))] rounded-md cursor-pointer transition-colors" title="Load File">
-                            <input type="file" className="hidden" accept=".json,.txt" onChange={handleFileUpload} />
-                            <Upload size={16} />
-                        </label>
-                        <button onClick={handleCopy} className="p-1.5 text-[hsl(var(--color-text-muted))] hover:text-[hsl(var(--color-text-main))] hover:bg-[hsl(var(--color-surface-hover))] rounded-md transition-colors" title="Copy to Clipboard">
-                            <Copy size={16} />
-                        </button>
-                        <button onClick={handleClear} className="p-1.5 text-[hsl(var(--color-text-muted))] hover:text-rose-500 hover:bg-rose-500/10 rounded-md transition-colors" title="Clear Editor">
-                            <Eraser size={16} />
-                        </button>
-                    </div>
-                </div>
-            </div>
+            )}
 
             {/* Editor Area */}
-            <div
-                className="bg-[hsl(var(--color-background))]"
-                style={{ flex: '1 1 0%', position: 'relative', overflow: 'hidden', minHeight: 0 }}
-            >
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+            <div className="flex-1 relative min-h-0 bg-slate-950">
+                <div className="absolute inset-0">
                     {viewMode === 'code' ? (
                         <Editor
                             height="100%"
                             defaultLanguage="json"
-                            theme="vs-dark"
+                            theme={theme === 'dark' ? 'vs-dark' : 'light'}
                             value={value}
                             onChange={handleChange}
                             onMount={handleEditorDidMount}
@@ -216,23 +233,22 @@ export default function EditorPane({ title, value, onChange, readOnly = false, h
                                 fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                                 wordWrap: 'on',
                                 formatOnPaste: true,
-                                readOnly: readOnly,
+                                readOnly,
                                 automaticLayout: true,
                                 padding: { top: 10, bottom: 10 },
                                 scrollBeyondLastLine: false,
                                 renderLineHighlight: 'all',
                                 smoothScrolling: true,
                                 lineNumbers: 'on',
-                                glyphMargin: false,
                                 folding: true,
                             }}
                         />
                     ) : (
-                        <div className="h-full w-full overflow-auto p-4 custom-scrollbar">
+                        <div className="h-full w-full overflow-auto p-4">
                             {parsedData ? (
                                 <JsonTreeViewer data={parsedData} />
                             ) : (
-                                <div className="flex flex-col items-center justify-center h-full text-[hsl(var(--color-text-muted))] gap-2 opacity-50">
+                                <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-2">
                                     <Braces size={32} />
                                     <span className="text-sm">Invalid JSON. Switch to Code view to fix errors.</span>
                                 </div>
