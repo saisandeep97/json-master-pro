@@ -204,9 +204,9 @@ export default function JsonEditor() {
                 style={{ flex: '1 1 0%', minHeight: 0 }}
             >
                 {layoutMode === 'split' ? (
-                    <div className="absolute inset-0 flex flex-row pt-2 pb-0">
+                    <div className="absolute inset-0 flex flex-row gap-0 pt-2 pb-0">
                         {/* Left Editor */}
-                        <div style={{ width: `${splitRatio}%` }} className="min-w-0 pr-1 h-full relative">
+                        <div style={{ width: `calc(${splitRatio}% - 24px)` }} className="min-w-0 h-full">
                             <EditorPane
                                 title="Document 1"
                                 value={leftInput}
@@ -217,29 +217,45 @@ export default function JsonEditor() {
                             />
                         </div>
 
-                        {/* Draggable Handle & Controls */}
-                        <div
-                            className="w-2 flex flex-col items-center justify-center relative z-10 cursor-col-resize group hover:bg-[hsl(var(--color-surface-hover))]"
-                            onMouseDown={handleMouseDown}
-                        >
-                            <div className={`absolute inset-y-0 left-1/2 w-0.5 bg-[hsl(var(--color-border))] transition-colors ${isDragging ? 'bg-indigo-500' : 'group-hover:bg-indigo-500'}`}></div>
+                        {/* Center Column with Controls */}
+                        <div style={{ width: 48, minWidth: 48, flexShrink: 0 }} className="h-full flex flex-col items-center relative">
+                            {/* Resize Handle Background */}
+                            <div
+                                className="absolute inset-0 cursor-col-resize group"
+                                onMouseDown={handleMouseDown}
+                            >
+                                {/* Center Line */}
+                                <div className={`absolute top-0 bottom-0 left-1/2 w-[2px] -translate-x-1/2 transition-all duration-200 ${isDragging ? 'bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]' : 'bg-[hsl(var(--color-border))] group-hover:bg-indigo-500/50'}`}></div>
+                            </div>
 
-                            {/* Central Controls (Floating over handle) */}
-                            <div className="absolute top-1/2 -translate-y-1/2 flex flex-col items-center justify-center gap-2 text-[hsl(var(--color-text-muted))] bg-[hsl(var(--color-background))] py-2 border border-[hsl(var(--color-border))] rounded-full shadow-xl pointer-events-auto cursor-default z-20">
-                                <button onClick={copyToRight} className="p-1.5 rounded-full hover:bg-[hsl(var(--color-surface-hover))] hover:text-[hsl(var(--color-text-main))] transition-colors" title="Copy to Right">
-                                    <ArrowRight size={14} />
+                            {/* Central Controls Panel */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1.5 bg-[hsl(var(--color-surface))] p-2 border border-[hsl(var(--color-border))] rounded-xl shadow-lg">
+                                <button
+                                    onClick={copyToRight}
+                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[hsl(var(--color-text-muted))] hover:bg-indigo-500 hover:text-white transition-all duration-200 group/btn"
+                                    title="Copy to Right"
+                                >
+                                    <ArrowRight size={16} className="group-hover/btn:translate-x-0.5 transition-transform" />
                                 </button>
-                                <button onClick={handleSwap} className="p-1.5 rounded-full hover:bg-[hsl(var(--color-surface-hover))] hover:text-[hsl(var(--color-text-main))] transition-colors" title="Swap">
-                                    <ArrowRightLeft size={14} />
+                                <button
+                                    onClick={handleSwap}
+                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[hsl(var(--color-text-muted))] hover:bg-indigo-500 hover:text-white transition-all duration-200 group/btn"
+                                    title="Swap Documents"
+                                >
+                                    <ArrowRightLeft size={16} className="group-hover/btn:rotate-180 transition-transform duration-300" />
                                 </button>
-                                <button onClick={copyToLeft} className="p-1.5 rounded-full hover:bg-[hsl(var(--color-surface-hover))] hover:text-[hsl(var(--color-text-main))] transition-colors" title="Copy to Left">
-                                    <ArrowLeft size={14} />
+                                <button
+                                    onClick={copyToLeft}
+                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-[hsl(var(--color-text-muted))] hover:bg-indigo-500 hover:text-white transition-all duration-200 group/btn"
+                                    title="Copy to Left"
+                                >
+                                    <ArrowLeft size={16} className="group-hover/btn:-translate-x-0.5 transition-transform" />
                                 </button>
                             </div>
                         </div>
 
                         {/* Right Editor */}
-                        <div style={{ width: `${100 - splitRatio}%` }} className="min-w-0 pl-1 h-full relative">
+                        <div style={{ width: `calc(${100 - splitRatio}% - 24px)` }} className="min-w-0 h-full">
                             <EditorPane
                                 title="Document 2"
                                 value={rightInput}
